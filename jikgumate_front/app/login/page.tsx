@@ -33,29 +33,40 @@ export default function LoginPage() {
       return;
     }
 
-    // 로그인 로직 구현 예정
-    console.log('로그인 시도:', formData);
-    
-    // 임시로 성공 처리 (실제로는 API 호출)
-    // TODO: 실제 로그인 API 호출
-    // try {
-    //   const response = await fetch('/api/auth/login', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(formData),
-    //   });
-    //   if (response.ok) {
-    //     router.push('/mypage');
-    //   } else {
-    //     setError('아이디 또는 비밀번호가 올바르지 않습니다.');
-    //   }
-    // } catch (err) {
-    //   setError('로그인 중 오류가 발생했습니다.');
-    // }
-    
-    // 임시 성공 처리
-    alert('로그인 성공! (임시 처리)');
-    router.push('/mypage');
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error('API 서버 URL이 설정되지 않았습니다.');
+      }
+      const response = await fetch(`${apiBaseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 로그인 성공 시 토큰 저장 (백엔드에서 토큰을 반환하는 경우)
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+        }
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        router.push('/mypage');
+      } else {
+        setError(data.message || '아이디 또는 비밀번호가 올바르지 않습니다.');
+      }
+    } catch (err) {
+      console.error('로그인 오류:', err);
+      setError('로그인 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.');
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {

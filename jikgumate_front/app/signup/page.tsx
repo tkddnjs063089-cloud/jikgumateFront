@@ -257,23 +257,44 @@ export default function SignupPage() {
 
       console.log('회원가입 데이터:', signupData);
 
-      // TODO: 실제 API 호출
-      // const response = await fetch('/api/auth/signup', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(signupData),
-      // });
-      // 
-      // if (!response.ok) {
-      //   const error = await response.json();
-      //   throw new Error(error.message || '회원가입에 실패했습니다.');
-      // }
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error('API 서버 URL이 설정되지 않았습니다.');
+      }
+      const response = await fetch(`${apiBaseUrl}/api/auth/signup`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(signupData),
+      });
 
-      // 임시 성공 처리
+      console.log('응답 상태:', response.status, response.statusText);
+      
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.log('응답 본문 (JSON 아님):', text);
+        throw new Error(`서버 오류: ${response.status} ${response.statusText}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '회원가입에 실패했습니다.');
+      }
+
+      // 회원가입 성공
       alert('회원가입이 완료되었습니다!');
       router.push('/login');
     } catch (error) {
-      setErrors({ submit: error instanceof Error ? error.message : '회원가입 중 오류가 발생했습니다.' });
+      console.error('회원가입 오류 상세:', error);
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        setErrors({ submit: '네트워크 오류가 발생했습니다. 백엔드 서버 연결을 확인해주세요.' });
+      } else {
+        setErrors({ submit: error instanceof Error ? error.message : '회원가입 중 오류가 발생했습니다.' });
+      }
     } finally {
       setIsSubmitting(false);
     }
