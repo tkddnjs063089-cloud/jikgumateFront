@@ -34,10 +34,21 @@ export default function LoginPage() {
     }
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-      if (!apiBaseUrl) {
-        throw new Error('API 서버 URL이 설정되지 않았습니다.');
+      let apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      
+      // 환경 변수가 없거나 빈 문자열인 경우 기본값 사용
+      if (!apiBaseUrl || apiBaseUrl.trim() === '') {
+        apiBaseUrl = 'https://ci-cd-jikgumate-1.onrender.com';
       }
+      
+      // URL 정리: 앞뒤 공백 제거, 마지막 슬래시 제거
+      apiBaseUrl = apiBaseUrl.trim().replace(/\/+$/, '');
+      
+      // URL이 올바른 형식인지 확인
+      if (!apiBaseUrl.startsWith('http://') && !apiBaseUrl.startsWith('https://')) {
+        throw new Error('API 서버 URL 형식이 올바르지 않습니다.');
+      }
+      
       const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: 'POST',
         headers: { 
