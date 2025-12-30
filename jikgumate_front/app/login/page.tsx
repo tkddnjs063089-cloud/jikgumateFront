@@ -7,8 +7,8 @@ import Link from 'next/link';
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    username: '',
-    password: '',
+    username: 'tkddnjs0630@naver.com',
+    password: 'tkddnjs0729!',
   });
   const [error, setError] = useState('');
 
@@ -38,7 +38,7 @@ export default function LoginPage() {
       if (!apiBaseUrl) {
         throw new Error('API 서버 URL이 설정되지 않았습니다.');
       }
-      const response = await fetch(`${apiBaseUrl}/api/auth/login`, {
+      const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
