@@ -261,7 +261,7 @@ export default function SignupPage() {
       if (!apiBaseUrl) {
         throw new Error('API 서버 URL이 설정되지 않았습니다.');
       }
-      const response = await fetch(`${apiBaseUrl}/api/auth/signup`, {
+      const response = await fetch(`${apiBaseUrl}auth/signup`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

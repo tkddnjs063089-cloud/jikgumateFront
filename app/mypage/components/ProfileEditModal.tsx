@@ -18,6 +18,8 @@ interface ProfileEditModalProps {
 export default function ProfileEditModal({ profile, onSave, onClose }: ProfileEditModalProps) {
   const [formData, setFormData] = useState<Profile>(profile);
   const [imagePreview, setImagePreview] = useState<string>(profile.profileImage);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     setFormData(profile);
@@ -27,6 +29,7 @@ export default function ProfileEditModal({ profile, onSave, onClose }: ProfileEd
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (error) setError('');
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,9 +45,70 @@ export default function ProfileEditModal({ profile, onSave, onClose }: ProfileEd
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const email = formData.email;
+
+      if (!token) {
+        setError('로그인이 필요합니다.');
+        return;
+      }
+
+      if (!email) {
+        setError('이메일이 필요합니다.');
+        return;
+      }
+
+      // API URL 설정
+      let apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://tactful-skyler-histrionically.ngrok-free.dev';
+      
+      // /api 경로 제거
+      if (apiBaseUrl.endsWith('/api')) {
+        apiBaseUrl = apiBaseUrl.slice(0, -4);
+      } else if (apiBaseUrl.includes('/api/')) {
+        apiBaseUrl = apiBaseUrl.replace('/api', '');
+      }
+      apiBaseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+
+      // 백엔드에 PATCH 요청
+      const response = await fetch(`${apiBaseUrl}/users/${encodeURIComponent(email)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: formData.nickname,
+          email: formData.email,
+          profile_image: formData.profileImage || undefined,
+        }),
+      });
+
+      if (response.ok) {
+        const updatedData = await response.json();
+        // 성공 시 부모 컴포넌트에 업데이트된 프로필 전달
+        onSave({
+          nickname: updatedData.name || formData.nickname,
+          email: updatedData.email || formData.email,
+          address: updatedData.default_address || formData.address,
+          profileImage: updatedData.profile_image || formData.profileImage,
+        });
+        onClose();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || '프로필 수정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('프로필 수정 오류:', error);
+      setError('프로필 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -150,36 +214,29 @@ export default function ProfileEditModal({ profile, onSave, onClose }: ProfileEd
             />
           </div>
 
-          {/* 기본 배송지 */}
-          <div>
-            <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-              기본 배송지
-            </label>
-            <textarea
-              id="address"
-              name="address"
-              value={formData.address}
-              onChange={handleInputChange}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
+          {/* 에러 메시지 */}
+          {error && (
+            <div className="text-red-600 text-sm text-center">
+              {error}
+            </div>
+          )}
 
           {/* 버튼 */}
           <div className="flex gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               취소
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              저장
+              {isSubmitting ? '저장 중...' : '저장'}
             </button>
           </div>
         </form>
