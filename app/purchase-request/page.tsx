@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { analyzeProduct } from '../utils/api';
 
   interface ProductInfo {
   title: string;
@@ -35,80 +36,26 @@ export default function PurchaseRequestPage() {
     setProductInfo(null);
 
     try {
-      // 토큰 확인
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setError('로그인이 필요합니다. 먼저 로그인해주세요.');
-        setIsLoading(false);
-        return;
-      }
+      console.log('상품 분석 시작:', productLink);
 
-      // API URL 설정
-      let apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://tactful-skyler-histrionically.ngrok-free.dev';
-      
-      // /api 경로 제거
-      if (apiBaseUrl.endsWith('/api')) {
-        apiBaseUrl = apiBaseUrl.slice(0, -4);
-      } else if (apiBaseUrl.includes('/api/')) {
-        apiBaseUrl = apiBaseUrl.replace('/api', '');
-      }
-      apiBaseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+      const data = await analyzeProduct(productLink);
+      console.log('상품 분석 결과:', data);
 
-      const apiUrl = `${apiBaseUrl}/products/analyze?url=${encodeURIComponent(productLink)}`;
-      console.log('API 호출 URL:', apiUrl);
-      console.log('토큰 존재:', !!token);
-      console.log('토큰 앞부분:', token ? `${token.substring(0, 20)}...` : '없음');
-
-      // /products/analyze로 GET 요청 (URL을 쿼리 파라미터로 전달, 토큰 포함)
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      console.log('API 응답 상태:', response.status, response.statusText);
-
-      if (response.ok) {
-        const data = await response.json();
-        setProductInfo(data);
-      } else {
-        // 에러 응답 본문 확인
-        let errorMessage = '상품 정보를 가져오는데 실패했습니다.';
-        
-        if (response.status === 401) {
-          // 401 에러인 경우 토큰이 유효하지 않거나 만료되었을 수 있음
-          errorMessage = '인증이 필요합니다. 다시 로그인해주세요.';
-          
-          // 토큰 제거하고 로그인 페이지로 리다이렉트할 수도 있음
-          // localStorage.removeItem('token');
-          // localStorage.removeItem('email');
-          // window.location.href = '/login';
-        } else {
-          try {
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-              const errorData = await response.json();
-              errorMessage = errorData.message || errorData.error || errorMessage;
-              console.error('에러 응답:', errorData);
-            } else {
-              const errorText = await response.text();
-              console.error('에러 응답 (텍스트):', errorText);
-              if (errorText) {
-                errorMessage = errorText;
-              }
-            }
-          } catch (e) {
-            console.error('에러 응답 파싱 오류:', e);
-          }
-        }
-        
-        setError(errorMessage);
-      }
+      setProductInfo(data);
     } catch (error) {
       console.error('상품 분석 오류:', error);
-      setError('상품 정보를 가져오는 중 오류가 발생했습니다.');
+
+      let errorMessage = '상품 정보를 가져오는 중 오류가 발생했습니다.';
+
+      if (error instanceof Error) {
+        if (error.message.includes('인증')) {
+          errorMessage = '인증이 필요합니다. 다시 로그인해주세요.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { onLoginSuccess } from '../utils/auth';
+import { getApiBaseUrl } from '../utils/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,24 +36,11 @@ export default function LoginPage() {
     }
 
     try {
-      let apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-      
-      // 환경 변수가 없거나 빈 문자열인 경우 기본값 사용
-      if (!apiBaseUrl || apiBaseUrl.trim() === '') {
-        apiBaseUrl = 'https://ci-cd-jikgumate-1.onrender.com';
-      }
-      
-      // URL 정리: 앞뒤 공백 제거, 마지막 슬래시 제거
-      apiBaseUrl = apiBaseUrl.trim().replace(/\/+$/, '');
-      
-      // URL이 올바른 형식인지 확인
-      if (!apiBaseUrl.startsWith('http://') && !apiBaseUrl.startsWith('https://')) {
-        throw new Error('API 서버 URL 형식이 올바르지 않습니다.');
-      }
-      
+      const apiBaseUrl = getApiBaseUrl();
+
       const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -88,12 +77,15 @@ export default function LoginPage() {
         // 이메일 저장 (백엔드 API 호출에 필요)
         localStorage.setItem('email', email);
         console.log('이메일 저장 완료:', email);
-        
+
         // 사용자 정보가 있으면 저장
         if (data.user) {
           localStorage.setItem('user', JSON.stringify(data.user));
         }
-        
+
+        // 토큰 모니터링 시작
+        onLoginSuccess();
+
         router.push('/mypage');
       } else {
         setError(data.message || data.error || '이메일 또는 비밀번호가 올바르지 않습니다.');
