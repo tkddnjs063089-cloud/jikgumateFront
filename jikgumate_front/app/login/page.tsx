@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { onLoginSuccess } from '../utils/auth';
+import { getApiBaseUrl } from '../utils/api';
 
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    username: 'tkddnjs0630@naver.com',
+    email: 'tkddnjs0630@naver.com',
     password: 'tkddnjs0729!',
   });
   const [error, setError] = useState('');
@@ -24,8 +26,8 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     // 입력 검증
-    if (!formData.username.trim()) {
-      setError('아이디를 입력해주세요.');
+    if (!formData.email.trim()) {
+      setError('이메일을 입력해주세요.');
       return;
     }
     if (!formData.password.trim()) {
@@ -34,34 +36,59 @@ export default function LoginPage() {
     }
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-      if (!apiBaseUrl) {
-        throw new Error('API 서버 URL이 설정되지 않았습니다.');
-      }
+      const apiBaseUrl = getApiBaseUrl();
+
       const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: formData.username,
+          email: formData.email,
           password: formData.password,
         }),
       });
 
       const data = await response.json();
+      console.log('로그인 응답 데이터:', data); // 디버깅용
 
       if (response.ok) {
-        // 로그인 성공 시 토큰 저장 (백엔드에서 토큰을 반환하는 경우)
-        if (data.token) {
-          localStorage.setItem('token', data.token);
+        // 백엔드 응답에서 액세스 토큰 추출 (여러 가능한 필드명 확인)
+        const accessToken = data.access_token || data.accessToken || data.token;
+        
+        if (accessToken) {
+          localStorage.setItem('token', accessToken);
+          console.log('토큰 저장 완료');
+        } else {
+          console.error('토큰을 찾을 수 없습니다. 응답 데이터:', data);
+          setError('로그인 응답에 토큰이 없습니다.');
+          return;
         }
+        
+        // 백엔드 응답에서 이메일 추출 (백엔드 응답 구조에 따라 다름)
+        const email = data.user?.email || data.email || formData.email;
+        
+        if (!email) {
+          console.error('이메일을 찾을 수 없습니다. 응답 데이터:', data);
+          setError('로그인 응답에 이메일이 없습니다.');
+          return;
+        }
+        
+        // 이메일 저장 (백엔드 API 호출에 필요)
+        localStorage.setItem('email', email);
+        console.log('이메일 저장 완료:', email);
+
+        // 사용자 정보가 있으면 저장
         if (data.user) {
           localStorage.setItem('user', JSON.stringify(data.user));
         }
+
+        // 토큰 모니터링 시작
+        onLoginSuccess();
+
         router.push('/mypage');
       } else {
-        setError(data.message || '아이디 또는 비밀번호가 올바르지 않습니다.');
+        setError(data.message || data.error || '이메일 또는 비밀번호가 올바르지 않습니다.');
       }
     } catch (err) {
       console.error('로그인 오류:', err);
@@ -90,23 +117,23 @@ export default function LoginPage() {
           </h1>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* 아이디 입력 */}
+            {/* 이메일 입력 */}
             <div>
               <label
-                htmlFor="username"
+                htmlFor="email"
                 className="block text-sm font-medium text-gray-700 mb-2"
               >
-                아이디
+                이메일
               </label>
               <input
-                type="text"
-                id="username"
-                name="username"
-                value={formData.username}
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="아이디를 입력하세요"
-                autoComplete="username"
+                placeholder="이메일을 입력하세요"
+                autoComplete="email"
               />
             </div>
 
