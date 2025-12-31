@@ -7,7 +7,6 @@ import ProfileEditModal from './components/ProfileEditModal';
 import OrderHistoryModal from './components/OrderHistoryModal';
 import { onLogout, startTokenMonitoring } from '../utils/auth';
 import { fetchUserProfile } from '../utils/api';
-import { getApiBaseUrl } from '../utils/api';
 
 export default function MyPage() {
   const router = useRouter();
