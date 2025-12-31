@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ProfileEditModal from './components/ProfileEditModal';
 import OrderHistoryModal from './components/OrderHistoryModal';
+import { onLogout, startTokenMonitoring } from '../utils/auth';
+import { fetchUserProfile } from '../utils/api';
+import { getApiBaseUrl } from '../utils/api';
 
 export default function MyPage() {
   const router = useRouter();
@@ -27,10 +30,10 @@ export default function MyPage() {
         // localStorage에서 토큰과 이메일 확인
         const token = localStorage.getItem('token');
         const email = localStorage.getItem('email');
-        
+
         console.log('마이페이지 접근 - 토큰:', token ? '있음' : '없음');
         console.log('마이페이지 접근 - 이메일:', email);
-        
+
         // 토큰이 없으면 로그인 페이지로 리다이렉트
         if (!token) {
           console.log('토큰이 없습니다. 로그인 페이지로 이동합니다.');
@@ -49,71 +52,38 @@ export default function MyPage() {
           return;
         }
 
-        // 백엔드 API에서 /users/{email}로 사용자 정보 조회
-        // Swagger: https://tactful-skyler-histrionically.ngrok-free.dev/api#/
-        // 실제 엔드포인트: /users/{email} (Swagger 문서 기준, /api 없음)
-        let apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://tactful-skyler-histrionically.ngrok-free.dev';
-        
-        // Swagger URL에 /api가 있지만 실제 API 엔드포인트는 /users/{email}이므로
-        // base URL에서 /api를 제거해야 함
-        if (apiBaseUrl.endsWith('/api')) {
-          apiBaseUrl = apiBaseUrl.slice(0, -4); // '/api' 제거
-        } else if (apiBaseUrl.includes('/api/')) {
-          // 중간에 /api/가 있으면 제거
-          apiBaseUrl = apiBaseUrl.replace('/api', '');
-        }
-        
-        // 마지막 슬래시 제거
-        apiBaseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
-        
-        const apiUrl = `${apiBaseUrl}/users/${encodeURIComponent(email)}`;
-        console.log('API 호출 URL:', apiUrl);
-        console.log('API Base URL:', apiBaseUrl);
-        console.log('이메일:', email);
-        console.log('사용하는 토큰:', token ? `${token.substring(0, 20)}...` : '없음');
-        
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+        // 토큰 모니터링 시작
+        startTokenMonitoring();
+
+        console.log('사용자 정보 조회 시작');
+        const userData = await fetchUserProfile(email);
+        console.log('사용자 데이터:', userData);
+
+        setIsLoggedIn(true);
+        setProfile({
+          nickname: userData.name || userData.nickname || '',
+          email: userData.email || email,
+          address: userData.default_address || userData.address || '',
+          profileImage: userData.profile_image || userData.profileImage || '',
         });
+      } catch (error) {
+        console.error('프로필 조회 오류:', error);
 
-        console.log('API 응답 상태:', response.status, response.statusText);
-        
-        // 에러 응답 본문 확인
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`${response.status} 에러 응답 본문:`, errorText);
-        }
-
-        if (response.ok) {
-          const userData = await response.json();
-          console.log('사용자 데이터:', userData);
-          setIsLoggedIn(true);
-          setProfile({
-            nickname: userData.name || userData.nickname || '',
-            email: userData.email || email,
-            address: userData.default_address || userData.address || '',
-            profileImage: userData.profile_image || userData.profileImage || '',
-          });
-        } else if (response.status === 401) {
-          // 토큰이 유효하지 않으면 로그인 페이지로 리다이렉트
-          console.log('토큰이 유효하지 않습니다. 로그인 페이지로 이동합니다.');
+        // 인증 오류인 경우 로그인 페이지로 리다이렉트
+        if (error instanceof Error && error.message.includes('인증')) {
+          console.log('인증 오류로 로그인 페이지로 이동합니다.');
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           localStorage.removeItem('email');
+          if (!hasShownAlertRef.current) {
+            alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+            hasShownAlertRef.current = true;
+          }
           router.push('/login');
           return;
-        } else {
-          console.error('프로필 조회 실패:', response.status, response.statusText);
-          // 다른 에러는 로그인 상태 유지하되 에러 표시
-          setIsLoggedIn(true);
         }
-      } catch (error) {
-        console.error('프로필 조회 오류:', error);
-        // 네트워크 오류 등은 로그인 상태 유지
+
+        // 다른 오류는 로그인 상태 유지
         setIsLoggedIn(true);
       } finally {
         setIsLoading(false);
@@ -131,20 +101,11 @@ export default function MyPage() {
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem('token');
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://tactful-skyler-histrionically.ngrok-free.dev';
-      
-      // /api 경로 제거
-      let logoutUrl = apiBaseUrl;
-      if (logoutUrl.endsWith('/api')) {
-        logoutUrl = logoutUrl.slice(0, -4);
-      } else if (logoutUrl.includes('/api/')) {
-        logoutUrl = logoutUrl.replace('/api', '');
-      }
-      logoutUrl = logoutUrl.endsWith('/') ? logoutUrl.slice(0, -1) : logoutUrl;
-      
+      const apiBaseUrl = getApiBaseUrl();
+
       // 로그아웃 API 호출
       if (token) {
-        await fetch(`${logoutUrl}/auth/logout`, {
+        await fetch(`${apiBaseUrl}/auth/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -155,11 +116,14 @@ export default function MyPage() {
     } catch (error) {
       console.error('로그아웃 API 호출 오류:', error);
     } finally {
+      // 토큰 모니터링 중지
+      onLogout();
+
       // localStorage 정리
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('email');
-      
+
       // 로그인 페이지로 리다이렉트
       router.push('/login');
     }
