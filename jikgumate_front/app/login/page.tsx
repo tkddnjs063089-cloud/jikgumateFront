@@ -36,7 +36,7 @@ export default function LoginPage() {
     }
 
     try {
-      const apiBaseUrl = getApiBaseUrl();
+      const apiBaseUrl = getApiBaseUrl;
 
       const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: 'POST',
